@@ -37,21 +37,21 @@ def infoBar():
         text = font.render("MINES: " + str(game.nummines),True,BLACK)
         text_x = text.get_rect().width
         text_y = text.get_rect().height
-        screen.blit(text,((150 - (text_x / 2)),(50 - (text_y / 2))))
+        screen.blit(text,(round(150 - (text_x / 2)), round(50 - (text_y / 2))))
         text = font.render("FLAGS: " + str(game.numflaged),True,BLACK)
         text_x = text.get_rect().width
         text_y = text.get_rect().height
-        screen.blit(text,((350 - (text_x / 2)),(50 - (text_y / 2))))
+        screen.blit(text,(round(350 - (text_x / 2)), round(50 - (text_y / 2))))
     elif gameState == 1:      #win
         text = font.render("YOU  WIN",True,BLACK)
         text_x = text.get_rect().width
         text_y = text.get_rect().height
-        screen.blit(text,((150 - (text_x / 2)),(50 - (text_y / 2))))
+        screen.blit(text,(round(150 - (text_x / 2)), round(50 - (text_y / 2))))
     elif gameState == 2:    #loose
         text = font.render("YOU  LOSE",True,BLACK)
         text_x = text.get_rect().width
         text_y = text.get_rect().height
-        screen.blit(text,((150 - (text_x / 2)),(50 - (text_y / 2))))
+        screen.blit(text,(round(150 - (text_x / 2)), round(50 - (text_y / 2))))
 
     
 
@@ -63,22 +63,13 @@ class Tile():
         self.neighbors = 0
         self.visible = False
         self.flag = False
-        self.complete = False
         self.left = row*square_width_height
         self.top = (column*square_width_height)+100
     
     def update(self, agent):
         global gameState
-        # if gameState == 0:
-        #     if agent.flag_state == False and agent.chosen_row == self.row and agent.chosen_col == self.column:
-        #         self.visible = True
-        #         self.flag = agent.flag_state
-        #     if agent.flag_state == True and agent.chosen_row == self.row and agent.chosen_col == self.column:
-        #         if self.flag == False:
-        #             self.flag = True
-        #         elif self.flag == True:
-        #             self.flag = False
         if self.visible == True and self.mine == True:
+            print("Trigger: (" + str(self.row) + ", " + str(self.column) + ")")
             gameState = 2
     
     def show(self):
@@ -92,7 +83,7 @@ class Tile():
                     text = font.render(str(self.neighbors),True,BLACK)
                     text_x = text.get_rect().width
                     text_y = text.get_rect().height
-                    screen.blit(text,((self.left + (square_width_height / 2) - (text_x / 2)),(self.top + (square_width_height / 2) - (text_y / 2))))
+                    screen.blit(text,(round(self.left + (square_width_height / 2) - (text_x / 2)), round(self.top + (square_width_height / 2) - (text_y / 2))))
             
             elif self.mine == True:
                 pygame.draw.rect(screen,RED,rect)
@@ -206,129 +197,183 @@ class Agent:
         self.chosen_col = 0
         self.chosen_row = 0
         self.mines_flagged = 0
-    def process_squares(self, game_setup):
-        num_squares = 0
+        self.possible_moves = []
+        self.correspronding_probs = []
+    def assign_possible(self):
         for row in range(ROWS_COLS):
             for col in range(ROWS_COLS):
-                if game_setup.board[row][col].visible and not game_setup.board[row][col].complete\
-                    and game_setup.board[row][col].neighbors:
+                self.possible_moves.append((col, row))
+                self.correspronding_probs.append(1)
+    def process_squares(self, game_setup):
+        num_squares = 1
+        while num_squares:
+            num_squares = 0
+            for idx, pair in enumerate(self.possible_moves):
+                col, row = pair
+                if game_setup.board[col][row].visible\
+                    and game_setup.board[col][row].neighbors:
                     self.chosen_col = col
                     self.chosen_row = row
                     probability = self.find_prob(game_setup)
-                    print("Prob:" + str(probability))
+                    self.correspronding_probs[idx] = probability
                     if probability == 1:
                         self.flag_all_neighbors(game_setup)
-                        game_setup.board[row][col].complete = True
+                        self.possible_moves.remove((col, row))
+                        self.correspronding_probs.pop(idx)
+                        #game_setup.board[col][row].complete = True
                         num_squares += 1
-                        print("Flag: " + str(row) + ", " + str(col))
+                        print("Flag: " + str(col) + ", " + str(row))
                         screen.fill(WHITE)
                         infoBar()
                         game.update(self)
                         game.render()
                         pygame.display.flip()
                         clock.tick(60)
+                        time.sleep(1) # AHHHHH
                         if gameState  == 1 or gameState ==2:
                             return 0
                     elif probability == 0:
                         self.show_all_neighbors(game_setup)
-                        game_setup.board[row][col].complete = True
+                        self.possible_moves.remove((col, row))
+                        self.correspronding_probs.pop(idx)
+                        #game_setup.board[col][row].complete = True
                         num_squares += 1
-                        print("Show: " + str(row) + ", " + str(col))
+                        print("Show: " + str(col) + ", " + str(row))
                         screen.fill(WHITE)
                         infoBar()
                         game.update(self)
                         game.render()
                         pygame.display.flip()
                         clock.tick(60)
+                        time.sleep(1) # AHHHH
                         if gameState  == 1 or gameState ==2:
                             return
+                elif not game_setup.board[col][row].neighbors:
+                        self.possible_moves.remove((col, row))
+                        self.correspronding_probs.pop(idx)
         return num_squares
     
 
     def show_all_neighbors(self, game_setup):
         self.flag_state = False
         if self.chosen_row+1 < ROWS_COLS and self.chosen_col+1 < ROWS_COLS \
-            and not game_setup.board[self.chosen_row+1][self.chosen_col+1].flag:
-            game_setup.board[self.chosen_row+1][self.chosen_col+1].visible = True
+            and not game_setup.board[self.chosen_col+1][self.chosen_row+1].flag:
+            game_setup.board[self.chosen_col+1][self.chosen_row+1].visible = True
         if self.chosen_col+1 < ROWS_COLS \
-            and not game_setup.board[self.chosen_row][self.chosen_col+1].flag:
-            game_setup.board[self.chosen_row][self.chosen_col+1].visible = True
+            and not game_setup.board[self.chosen_col+1][self.chosen_row].flag:
+            game_setup.board[self.chosen_col+1][self.chosen_row].visible = True
         if self.chosen_row+1 < ROWS_COLS \
-            and not game_setup.board[self.chosen_row+1][self.chosen_col].flag:
-            game_setup.board[self.chosen_row+1][self.chosen_col].visible = True
+            and not game_setup.board[self.chosen_col][self.chosen_row+1].flag:
+            game_setup.board[self.chosen_col][self.chosen_row+1].visible = True
         if self.chosen_row-1 >= 0 and self.chosen_col-1 >= 0 \
-            and not game_setup.board[self.chosen_row-1][self.chosen_col-1].flag:
-            game_setup.board[self.chosen_row-1][self.chosen_col-1].visible = True
+            and not game_setup.board[self.chosen_col-1][self.chosen_row-1].flag:
+            game_setup.board[self.chosen_col-1][self.chosen_row-1].visible = True
         if self.chosen_col-1 >= 0 \
-            and not game_setup.board[self.chosen_row][self.chosen_col-1].flag:
-            game_setup.board[self.chosen_row][self.chosen_col-1].visible = True
+            and not game_setup.board[self.chosen_col-1][self.chosen_row].flag:
+            game_setup.board[self.chosen_col-1][self.chosen_row].visible = True
         if self.chosen_row-1 >= 0 \
-            and not game_setup.board[self.chosen_row-1][self.chosen_col].flag:
-            game_setup.board[self.chosen_row-1][self.chosen_col].visible = True
+            and not game_setup.board[self.chosen_col][self.chosen_row-1].flag:
+            game_setup.board[self.chosen_col][self.chosen_row-1].visible = True
         if self.chosen_row+1 < ROWS_COLS and self.chosen_col-1 >= 0 \
-            and not game_setup.board[self.chosen_row+1][self.chosen_col-1].flag:
-            game_setup.board[self.chosen_row+1][self.chosen_col-1].visible = True
+            and not game_setup.board[self.chosen_col-1][self.chosen_row+1].flag:
+            game_setup.board[self.chosen_col-1][self.chosen_row+1].visible = True
         if self.chosen_row-1 >= 0 and self.chosen_col+1 < ROWS_COLS \
-            and not game_setup.board[self.chosen_row-1][self.chosen_col+1].flag:
-            game_setup.board[self.chosen_row-1][self.chosen_col+1].visible = True
+            and not game_setup.board[self.chosen_col+1][self.chosen_row-1].flag:
+            game_setup.board[self.chosen_col+1][self.chosen_row-1].visible = True
         
     def flag_all_neighbors(self, game_setup):
-        if self.chosen_row+1 < ROWS_COLS and self.chosen_col+1 < ROWS_COLS and not game_setup.board[self.chosen_row+1][self.chosen_col+1].visible:
-            game_setup.board[self.chosen_row+1][self.chosen_col+1].flag = True
-        if self.chosen_col+1 < ROWS_COLS and not game_setup.board[self.chosen_row][self.chosen_col+1].visible:
-            game_setup.board[self.chosen_row][self.chosen_col+1].flag = True
-        if self.chosen_row+1 < ROWS_COLS and not game_setup.board[self.chosen_row+1][self.chosen_col].visible:
-            game_setup.board[self.chosen_row+1][self.chosen_col].flag = True
-        if self.chosen_row-1 >= 0 and self.chosen_col-1 >= 0 and not game_setup.board[self.chosen_row-1][self.chosen_col-1].visible:
-            game_setup.board[self.chosen_row-1][self.chosen_col-1].flag = True
-        if self.chosen_col-1 >= 0 and not game_setup.board[self.chosen_row][self.chosen_col-1].visible:
-            game_setup.board[self.chosen_row][self.chosen_col-1].flag = True
-        if self.chosen_row-1 >= 0 and not game_setup.board[self.chosen_row-1][self.chosen_col].visible:
-            game_setup.board[self.chosen_row-1][self.chosen_col].flag = True
-        if self.chosen_row+1 < ROWS_COLS and self.chosen_col-1 >= 0 and not game_setup.board[self.chosen_row+1][self.chosen_col-1].visible:
-            game_setup.board[self.chosen_row+1][self.chosen_col-1].flag = True
-        if self.chosen_row-1 >= 0 and self.chosen_col+1 < ROWS_COLS and not game_setup.board[self.chosen_row-1][self.chosen_col+1].visible:
-            game_setup.board[self.chosen_row-1][self.chosen_col+1].flag = True        
+        if self.chosen_row+1 < ROWS_COLS and self.chosen_col+1 < ROWS_COLS and not game_setup.board[self.chosen_col+1][self.chosen_row+1].visible:
+            game_setup.board[self.chosen_col+1][self.chosen_row+1].flag = True
+        if self.chosen_col+1 < ROWS_COLS and not game_setup.board[self.chosen_col+1][self.chosen_row].visible:
+            game_setup.board[self.chosen_col+1][self.chosen_row].flag = True
+        if self.chosen_row+1 < ROWS_COLS and not game_setup.board[self.chosen_col][self.chosen_row+1].visible:
+            game_setup.board[self.chosen_col][self.chosen_row+1].flag = True
+        if self.chosen_row-1 >= 0 and self.chosen_col-1 >= 0 and not game_setup.board[self.chosen_col-1][self.chosen_row-1].visible:
+            game_setup.board[self.chosen_col-1][self.chosen_row-1].flag = True
+        if self.chosen_col-1 >= 0 and not game_setup.board[self.chosen_col-1][self.chosen_row].visible:
+            game_setup.board[self.chosen_col-1][self.chosen_row].flag = True
+        if self.chosen_row-1 >= 0 and not game_setup.board[self.chosen_col][self.chosen_row-1].visible:
+            game_setup.board[self.chosen_col][self.chosen_row-1].flag = True
+        if self.chosen_row+1 < ROWS_COLS and self.chosen_col-1 >= 0 and not game_setup.board[self.chosen_col-1][self.chosen_row+1].visible:
+            game_setup.board[self.chosen_col-1][self.chosen_row+1].flag = True
+        if self.chosen_row-1 >= 0 and self.chosen_col+1 < ROWS_COLS and not game_setup.board[self.chosen_col+1][self.chosen_row-1].visible:
+            game_setup.board[self.chosen_col+1][self.chosen_row-1].flag = True        
     
     def find_prob(self, game_setup):
-        total = game_setup.board[self.chosen_row][self.chosen_col].neighbors
+        total = game_setup.board[self.chosen_col][self.chosen_row].neighbors
         total_hidden = 8
-        if self.chosen_row+1 < ROWS_COLS and self.chosen_col+1 < ROWS_COLS and game_setup.board[self.chosen_row+1][self.chosen_col+1].flag:
+        if (self.chosen_row+1 >= ROWS_COLS and self.chosen_col+1 >= ROWS_COLS) or\
+            (self.chosen_row-1 < 0 and self.chosen_col-1 < 0) or\
+            (self.chosen_row+1 >= ROWS_COLS and self.chosen_col-1 < 0) or\
+            (self.chosen_row-1 < 0 and self.chosen_col+1 >= ROWS_COLS):
+            total_hidden = 3
+        elif self.chosen_row+1 >= ROWS_COLS or self.chosen_row-1 < 0 or\
+            self.chosen_col+1 >= ROWS_COLS or self.chosen_col-1 < 0:
+            total_hidden = 5
+        if self.chosen_row+1 < ROWS_COLS and self.chosen_col+1 < ROWS_COLS and game_setup.board[self.chosen_col+1][self.chosen_row+1].flag:
             total -= 1
-        if self.chosen_col+1 < ROWS_COLS and game_setup.board[self.chosen_row][self.chosen_col+1].flag:
+        if self.chosen_col+1 < ROWS_COLS and game_setup.board[self.chosen_col+1][self.chosen_row].flag:
+           total -= 1
+        if self.chosen_row+1 < ROWS_COLS and game_setup.board[self.chosen_col][self.chosen_row+1].flag:
+           total -= 1
+        if self.chosen_row-1 >= 0 and self.chosen_col-1 >= 0 and game_setup.board[self.chosen_col-1][self.chosen_row-1].flag:
             total -= 1
-        if self.chosen_row+1 < ROWS_COLS and game_setup.board[self.chosen_row+1][self.chosen_col].flag:
+        if self.chosen_col-1 >= 0 and game_setup.board[self.chosen_col-1][self.chosen_row].flag:
+           total -= 1
+        if self.chosen_row-1 >= 0 and game_setup.board[self.chosen_col][self.chosen_row-1].flag:
+           total -= 1
+        if self.chosen_row+1 < ROWS_COLS and self.chosen_col-1 >= 0 and game_setup.board[self.chosen_col-1][self.chosen_row+1].flag:
             total -= 1
-        if self.chosen_row-1 >= 0 and self.chosen_col-1 >= 0 and game_setup.board[self.chosen_row-1][self.chosen_col-1].flag:
-            total -= 1
-        if self.chosen_col-1 >= 0 and game_setup.board[self.chosen_row][self.chosen_col-1].flag:
-            total -= 1
-        if self.chosen_row-1 >= 0 and game_setup.board[self.chosen_row-1][self.chosen_col].flag:
-            total -= 1
-        if self.chosen_row+1 < ROWS_COLS and self.chosen_col-1 >= 0 and game_setup.board[self.chosen_row+1][self.chosen_col-1].flag:
-            total -= 1
-        if self.chosen_row-1 >= 0 and self.chosen_col+1 < ROWS_COLS and game_setup.board[self.chosen_row-1][self.chosen_col+1].flag:
+        if self.chosen_row-1 >= 0 and self.chosen_col+1 < ROWS_COLS and game_setup.board[self.chosen_col+1][self.chosen_row-1].flag:
             total -= 1
         
-        if self.chosen_row+1 < ROWS_COLS and self.chosen_col+1 < ROWS_COLS and game_setup.board[self.chosen_row+1][self.chosen_col+1].visible:
+        if self.chosen_row+1 < ROWS_COLS and self.chosen_col+1 < ROWS_COLS and (game_setup.board[self.chosen_col+1][self.chosen_row+1].visible or game_setup.board[self.chosen_col+1][self.chosen_row+1].flag):
             total_hidden -= 1
-        if self.chosen_col+1 < ROWS_COLS and game_setup.board[self.chosen_row][self.chosen_col+1].visible:
+        if self.chosen_col+1 < ROWS_COLS and (game_setup.board[self.chosen_col+1][self.chosen_row].visible or game_setup.board[self.chosen_col+1][self.chosen_row].flag):
             total_hidden -= 1
-        if self.chosen_row+1 < ROWS_COLS and game_setup.board[self.chosen_row+1][self.chosen_col].visible:
+        if self.chosen_row+1 < ROWS_COLS and (game_setup.board[self.chosen_col][self.chosen_row+1].visible or game_setup.board[self.chosen_col][self.chosen_row+1].flag):
             total_hidden -= 1
-        if self.chosen_row-1 >= 0 and self.chosen_col-1 >= 0 and game_setup.board[self.chosen_row-1][self.chosen_col-1].visible:
+        if self.chosen_row-1 >= 0 and self.chosen_col-1 >= 0 and (game_setup.board[self.chosen_col-1][self.chosen_row-1].visible or game_setup.board[self.chosen_col-1][self.chosen_row-1].flag):
             total_hidden -= 1
-        if self.chosen_col-1 >= 0 and game_setup.board[self.chosen_row][self.chosen_col-1].visible:
+        if self.chosen_col-1 >= 0 and (game_setup.board[self.chosen_col-1][self.chosen_row].visible or game_setup.board[self.chosen_col-1][self.chosen_row].flag):
             total_hidden -= 1
-        if self.chosen_row-1 >= 0 and game_setup.board[self.chosen_row-1][self.chosen_col].visible:
+        if self.chosen_row-1 >= 0 and (game_setup.board[self.chosen_col][self.chosen_row-1].visible or game_setup.board[self.chosen_col][self.chosen_row-1].flag):
             total_hidden -= 1
-        if self.chosen_row+1 < ROWS_COLS and self.chosen_col-1 >= 0 and game_setup.board[self.chosen_row+1][self.chosen_col-1].visible:
+        if self.chosen_row+1 < ROWS_COLS and self.chosen_col-1 >= 0 and (game_setup.board[self.chosen_col-1][self.chosen_row+1].visible or game_setup.board[self.chosen_col-1][self.chosen_row+1].flag):
             total_hidden -= 1
-        if self.chosen_row-1 >= 0 and self.chosen_col+1 < ROWS_COLS and game_setup.board[self.chosen_row-1][self.chosen_col+1].visible:
+        if self.chosen_row-1 >= 0 and self.chosen_col+1 < ROWS_COLS and (game_setup.board[self.chosen_col+1][self.chosen_row-1].visible or game_setup.board[self.chosen_col+1][self.chosen_row-1].flag):
             total_hidden -= 1
         if total_hidden == 0:
             return 0
+        
+        print("Prob for (" + str(self.chosen_col) + ", " + str(self.chosen_row) + "):" + str(total) + "/" + str(total_hidden) + "  --  " + str(total/total_hidden))
         return total/total_hidden
+
+    def choose_random(self, game_setup):
+        best_random = []
+        min_prob = min(self.correspronding_probs)
+        for idx, prob in enumerate(self.correspronding_probs):
+            if prob <= min_prob:
+                best_random.append(self.possible_moves[idx])
+        idx_rand = random.randrange(len(best_random))
+        row, col = best_random[idx_rand]
+        print("Random: " + str(col) + ", " + str(row))
+        if col-1 >= 0 and not game.board[col-1][row].visible and not game.board[col-1][row].flag:
+            game.board[col-1][row].visible = True
+        elif col+1 < ROWS_COLS and not game.board[col+1][row].visible and not game.board[col+1][row].flag:
+            game.board[col+1][row].visible = True
+        elif row-1 >= 0 and not game.board[col][row-1].visible and not game.board[col][row-1].flag:
+            game.board[col][row-1].visible = True
+        elif row+1 < ROWS_COLS and not game.board[col][row+1].visible and not game.board[col][row+1].flag:
+            game.board[col][row+1].visible = True
+        elif row+1 < ROWS_COLS and col+1 < ROWS_COLS and not game.board[col+1][row+1].visible and not game.board[col+1][row+1].flag:
+            game.board[col+1][row+1].visible = True
+        elif row+1 < ROWS_COLS and col-1 >= 0 and not game.board[col-1][row+1].visible and not game.board[col-1][row+1].flag:
+            game.board[col-1][row+1].visible = True
+        elif row-1 >= 0 and col-1 >= 0 and not game.board[col-1][row-1].visible and not game.board[col-1][row-1].flag:
+            game.board[col-1][row-1].visible = True
+        elif row-1 >= 0 and col+1 < ROWS_COLS and not game.board[col+1][row-1].visible and not game.board[col+1][row-1].flag:
+            game.board[col+1][row-1].visible = True
 
 
 
@@ -338,6 +383,16 @@ if __name__ == "__main__":
     gameState = 0
     agent = Agent()
     
+    game.board[agent.chosen_col][agent.chosen_row].visible = True
+    screen.fill(WHITE)
+    infoBar()
+        
+    game.update(agent)
+    game.render()
+    
+    pygame.display.flip()
+    clock.tick(60)
+    agent.assign_possible()
     while not done:
         events = pygame.event.get()
         if events and events[0].type == pygame.QUIT:
@@ -347,10 +402,10 @@ if __name__ == "__main__":
             if gameState  == 1 or gameState ==2:
                 done = True
             elif not num:
-                print("Not: " + str(agent.chosen_col) + ", " + str(agent.chosen_row))
-                row = random.randrange(ROWS_COLS-1)
-                col = random.randrange(ROWS_COLS-1)
-                game.board[row][col].visible = True
+                agent.choose_random(game)
+                game.update(agent)
+                if gameState  == 1 or gameState ==2:
+                    done = True
     
         screen.fill(WHITE)
         infoBar()
