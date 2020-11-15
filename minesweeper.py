@@ -5,7 +5,7 @@ import pygame
 pygame.init()
 
 RED = (255,0,0)
-ORANGE = (255,127,0)
+GREEN = (0,255,0)
 YELLOW = (255,255,0)
 WHITE = (255,255,255)
 GREY = (127,127,127)
@@ -84,7 +84,8 @@ class Tile():
                     text_x = text.get_rect().width
                     text_y = text.get_rect().height
                     screen.blit(text,(round(self.left + (square_width_height / 2) - (text_x / 2)), round(self.top + (square_width_height / 2) - (text_y / 2))))
-            
+            elif self.mine == True and gameState == 1:
+                pygame.draw.rect(screen,GREEN,rect)
             elif self.mine == True:
                 pygame.draw.rect(screen,RED,rect)
         
@@ -204,7 +205,9 @@ class Agent:
             for col in range(ROWS_COLS):
                 self.possible_moves.append((col, row))
                 self.correspronding_probs.append(1)
+
     def process_squares(self, game_setup):
+        global gameState
         num_squares = 1
         while num_squares:
             num_squares = 0
@@ -220,7 +223,6 @@ class Agent:
                         self.flag_all_neighbors(game_setup)
                         self.possible_moves.remove((col, row))
                         self.correspronding_probs.pop(idx)
-                        #game_setup.board[col][row].complete = True
                         num_squares += 1
                         print("Flag: " + str(col) + ", " + str(row))
                         screen.fill(WHITE)
@@ -230,13 +232,14 @@ class Agent:
                         pygame.display.flip()
                         clock.tick(60)
                         time.sleep(1) # AHHHHH
+                        if self.mines_flagged == MINES:
+                            gameState = 1
                         if gameState  == 1 or gameState ==2:
                             return 0
                     elif probability == 0:
                         self.show_all_neighbors(game_setup)
                         self.possible_moves.remove((col, row))
                         self.correspronding_probs.pop(idx)
-                        #game_setup.board[col][row].complete = True
                         num_squares += 1
                         print("Show: " + str(col) + ", " + str(row))
                         screen.fill(WHITE)
@@ -252,10 +255,8 @@ class Agent:
                         self.possible_moves.remove((col, row))
                         self.correspronding_probs.pop(idx)
         return num_squares
-    
 
     def show_all_neighbors(self, game_setup):
-        self.flag_state = False
         if self.chosen_row+1 < ROWS_COLS and self.chosen_col+1 < ROWS_COLS \
             and not game_setup.board[self.chosen_col+1][self.chosen_row+1].flag:
             game_setup.board[self.chosen_col+1][self.chosen_row+1].visible = True
@@ -282,22 +283,70 @@ class Agent:
             game_setup.board[self.chosen_col+1][self.chosen_row-1].visible = True
         
     def flag_all_neighbors(self, game_setup):
-        if self.chosen_row+1 < ROWS_COLS and self.chosen_col+1 < ROWS_COLS and not game_setup.board[self.chosen_col+1][self.chosen_row+1].visible:
+        if self.chosen_row+1 < ROWS_COLS and self.chosen_col+1 < ROWS_COLS and not game_setup.board[self.chosen_col+1][self.chosen_row+1].visible\
+            and not game_setup.board[self.chosen_col+1][self.chosen_row+1].flag:
             game_setup.board[self.chosen_col+1][self.chosen_row+1].flag = True
-        if self.chosen_col+1 < ROWS_COLS and not game_setup.board[self.chosen_col+1][self.chosen_row].visible:
+            self.mines_flagged += 1
+            if (self.chosen_col+1,self.chosen_row+1) in self.possible_moves:
+                idx = self.possible_moves.index((self.chosen_col+1,self.chosen_row+1))
+                self.correspronding_probs.pop(idx)
+                self.possible_moves.remove((self.chosen_col+1,self.chosen_row+1))
+        if self.chosen_col+1 < ROWS_COLS and not game_setup.board[self.chosen_col+1][self.chosen_row].visible\
+            and not game_setup.board[self.chosen_col+1][self.chosen_row].flag:
             game_setup.board[self.chosen_col+1][self.chosen_row].flag = True
-        if self.chosen_row+1 < ROWS_COLS and not game_setup.board[self.chosen_col][self.chosen_row+1].visible:
+            self.mines_flagged += 1
+            if (self.chosen_col+1,self.chosen_row) in self.possible_moves:
+                idx = self.possible_moves.index((self.chosen_col+1,self.chosen_row))
+                self.correspronding_probs.pop(idx)
+                self.possible_moves.remove((self.chosen_col+1,self.chosen_row))
+        if self.chosen_row+1 < ROWS_COLS and not game_setup.board[self.chosen_col][self.chosen_row+1].visible\
+            and not game_setup.board[self.chosen_col][self.chosen_row+1].flag:
             game_setup.board[self.chosen_col][self.chosen_row+1].flag = True
-        if self.chosen_row-1 >= 0 and self.chosen_col-1 >= 0 and not game_setup.board[self.chosen_col-1][self.chosen_row-1].visible:
+            self.mines_flagged += 1
+            if (self.chosen_col,self.chosen_row+1) in self.possible_moves:
+                idx = self.possible_moves.index((self.chosen_col,self.chosen_row+1))
+                self.correspronding_probs.pop(idx)
+                self.possible_moves.remove((self.chosen_col,self.chosen_row+1))
+        if self.chosen_row-1 >= 0 and self.chosen_col-1 >= 0 and not game_setup.board[self.chosen_col-1][self.chosen_row-1].visible\
+            and not game_setup.board[self.chosen_col-1][self.chosen_row-1].flag:
             game_setup.board[self.chosen_col-1][self.chosen_row-1].flag = True
-        if self.chosen_col-1 >= 0 and not game_setup.board[self.chosen_col-1][self.chosen_row].visible:
+            self.mines_flagged += 1
+            if (self.chosen_col-1,self.chosen_row-1) in self.possible_moves:
+                idx = self.possible_moves.index((self.chosen_col-1,self.chosen_row-1))
+                self.correspronding_probs.pop(idx)
+                self.possible_moves.remove((self.chosen_col-1,self.chosen_row-1))
+        if self.chosen_col-1 >= 0 and not game_setup.board[self.chosen_col-1][self.chosen_row].visible\
+            and not game_setup.board[self.chosen_col-1][self.chosen_row].flag:
             game_setup.board[self.chosen_col-1][self.chosen_row].flag = True
-        if self.chosen_row-1 >= 0 and not game_setup.board[self.chosen_col][self.chosen_row-1].visible:
+            self.mines_flagged += 1
+            if (self.chosen_col-1,self.chosen_row) in self.possible_moves:
+                idx = self.possible_moves.index((self.chosen_col-1,self.chosen_row))
+                self.correspronding_probs.pop(idx)
+                self.possible_moves.remove((self.chosen_col-1,self.chosen_row))
+        if self.chosen_row-1 >= 0 and not game_setup.board[self.chosen_col][self.chosen_row-1].visible\
+            and not game_setup.board[self.chosen_col][self.chosen_row-1].flag:
             game_setup.board[self.chosen_col][self.chosen_row-1].flag = True
-        if self.chosen_row+1 < ROWS_COLS and self.chosen_col-1 >= 0 and not game_setup.board[self.chosen_col-1][self.chosen_row+1].visible:
+            self.mines_flagged += 1
+            if (self.chosen_col,self.chosen_row-1) in self.possible_moves:
+                idx = self.possible_moves.index((self.chosen_col,self.chosen_row-1))
+                self.correspronding_probs.pop(idx)
+                self.possible_moves.remove((self.chosen_col,self.chosen_row-1))
+        if self.chosen_row+1 < ROWS_COLS and self.chosen_col-1 >= 0 and not game_setup.board[self.chosen_col-1][self.chosen_row+1].visible\
+            and not game_setup.board[self.chosen_col-1][self.chosen_row+1].flag:
             game_setup.board[self.chosen_col-1][self.chosen_row+1].flag = True
-        if self.chosen_row-1 >= 0 and self.chosen_col+1 < ROWS_COLS and not game_setup.board[self.chosen_col+1][self.chosen_row-1].visible:
-            game_setup.board[self.chosen_col+1][self.chosen_row-1].flag = True        
+            self.mines_flagged += 1
+            if (self.chosen_col-1,self.chosen_row+1) in self.possible_moves:
+                idx = self.possible_moves.index((self.chosen_col-1,self.chosen_row+1))
+                self.correspronding_probs.pop(idx)
+                self.possible_moves.remove((self.chosen_col-1,self.chosen_row+1))
+        if self.chosen_row-1 >= 0 and self.chosen_col+1 < ROWS_COLS and not game_setup.board[self.chosen_col+1][self.chosen_row-1].visible\
+            and not game_setup.board[self.chosen_col+1][self.chosen_row-1].flag:
+            game_setup.board[self.chosen_col+1][self.chosen_row-1].flag = True 
+            self.mines_flagged += 1
+            if (self.chosen_col+1,self.chosen_row-1) in self.possible_moves:
+                idx = self.possible_moves.index((self.chosen_col+1,self.chosen_row-1))
+                self.correspronding_probs.pop(idx)
+                self.possible_moves.remove((self.chosen_col+1,self.chosen_row-1))
     
     def find_prob(self, game_setup):
         total = game_setup.board[self.chosen_col][self.chosen_row].neighbors
@@ -350,30 +399,30 @@ class Agent:
         return total/total_hidden
 
     def choose_random(self, game_setup):
-        best_random = []
         min_prob = min(self.correspronding_probs)
-        for idx, prob in enumerate(self.correspronding_probs):
-            if prob <= min_prob:
-                best_random.append(self.possible_moves[idx])
-        idx_rand = random.randrange(len(best_random))
-        row, col = best_random[idx_rand]
-        print("Random: " + str(col) + ", " + str(row))
+        idx = self.correspronding_probs.index(min_prob)
+        col, row = self.possible_moves[idx]
+        random_moves = []
         if col-1 >= 0 and not game.board[col-1][row].visible and not game.board[col-1][row].flag:
-            game.board[col-1][row].visible = True
+            random_moves.append((col-1, row))
         elif col+1 < ROWS_COLS and not game.board[col+1][row].visible and not game.board[col+1][row].flag:
-            game.board[col+1][row].visible = True
+            random_moves.append((col+1, row))
         elif row-1 >= 0 and not game.board[col][row-1].visible and not game.board[col][row-1].flag:
-            game.board[col][row-1].visible = True
+            random_moves.append((col, row-1))
         elif row+1 < ROWS_COLS and not game.board[col][row+1].visible and not game.board[col][row+1].flag:
-            game.board[col][row+1].visible = True
+            random_moves.append((col, row+1))
         elif row+1 < ROWS_COLS and col+1 < ROWS_COLS and not game.board[col+1][row+1].visible and not game.board[col+1][row+1].flag:
-            game.board[col+1][row+1].visible = True
+            random_moves.append((col+1, row+1))
         elif row+1 < ROWS_COLS and col-1 >= 0 and not game.board[col-1][row+1].visible and not game.board[col-1][row+1].flag:
-            game.board[col-1][row+1].visible = True
+            random_moves.append((col-1, row+1))
         elif row-1 >= 0 and col-1 >= 0 and not game.board[col-1][row-1].visible and not game.board[col-1][row-1].flag:
-            game.board[col-1][row-1].visible = True
+            random_moves.append((col-1, row-1))
         elif row-1 >= 0 and col+1 < ROWS_COLS and not game.board[col+1][row-1].visible and not game.board[col+1][row-1].flag:
-            game.board[col+1][row-1].visible = True
+            random_moves.append((col+1, row-1))
+        idx_rand = random.randrange(len(random_moves))
+        col, row = random_moves[idx_rand]
+        game.board[col][row].visible = True
+        print("Random: " + str(col) + ", " + str(row))
 
 
 
@@ -393,7 +442,7 @@ if __name__ == "__main__":
     pygame.display.flip()
     clock.tick(60)
     agent.assign_possible()
-    while not done:
+    while not done and agent.possible_moves:
         events = pygame.event.get()
         if events and events[0].type == pygame.QUIT:
             done = True
@@ -406,7 +455,6 @@ if __name__ == "__main__":
                 game.update(agent)
                 if gameState  == 1 or gameState ==2:
                     done = True
-    
         screen.fill(WHITE)
         infoBar()
         
@@ -414,7 +462,6 @@ if __name__ == "__main__":
         game.render()
     
         pygame.display.flip()
-    
         clock.tick(60)
     while not events:
         None
